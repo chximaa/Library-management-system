@@ -311,9 +311,9 @@ END;
 -- update member
 
 CREATE OR REPLACE FUNCTION update_member(
-   p_member_id   IN members.member_id%TYPE,
-    p_member_name IN members.member_name%TYPE,
-    p_email       IN members.email%TYPE
+   p_member_id     IN members.member_id%TYPE,
+    p_member_name  IN members.member_name%TYPE,
+    p_email        IN members.email%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -332,9 +332,9 @@ BEGIN
 
     -- Update member info
     UPDATE members
-    SET member_name = p_member_name,
-        email       = p_email
-    WHERE members_id = p_member_id;
+    SET member_name   = p_member_name,
+        email         = p_email
+    WHERE members_id  = p_member_id;
 
     v_message := 'Member with ID ' || p_member_id || ' updated successfully.';
     RETURN v_message;
@@ -390,10 +390,8 @@ END;
 
 
 CREATE OR REPLACE FUNCTION borrow_book(
-    p_borrow_id IN borrowings.borrow_id%TYPE,
-    p_book_id IN borrowings.book_id%TYPE,
-    p_members_id IN borrowings.members_id%TYPE,
-    p_borrowed_date IN borrowings.borrowed_date%TYPE
+    p_book_id        IN borrowings.book_id%TYPE,
+    p_members_id     IN borrowings.members_id%TYPE
 )
 RETURN varchar2
 AS
@@ -473,4 +471,5 @@ END;
 
 
 commit;
+
 
