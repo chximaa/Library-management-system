@@ -1,3 +1,10 @@
+-- creating the database in order to use it 
+--CREATE DATABASE library;  
+--USE DATABASE library;
+
+
+
+-- creating necessary tables
 CREATE TABLE books(
     book_id NUMBER(10) primary key,
     book_title varchar2(30),
@@ -22,10 +29,9 @@ CREATE TABLE borrowings(
     FOREIGN key (book_id )  references books(book_id) ,
     FOREIGN key (members_id)  references members(members_id) 
 );
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ 
 
-SELECT * from BOOKS ;
-SELECT * FROM MEMBERS;
-SELECT * from BORROWINGS;
 
 INSERT INTO books (book_id, book_title, author, publisher, year_publishes, available_copies)
 VALUES (1, 'The Alchemist', 'Paulo Coelho', 'HarperCollins', TO_DATE('1993-05-01', 'YYYY-MM-DD'), 5);
@@ -78,16 +84,24 @@ VALUES (4, 1, 4, TO_DATE('2025-10-23', 'YYYY-MM-DD'), NULL);
 INSERT INTO borrowings (borrow_id, book_id, members_id, borrowed_date, return_day)
 VALUES (5, 5, 5, TO_DATE('2025-10-24', 'YYYY-MM-DD'), NULL);
 
--------------------------------------------------------------------
+-- check if everything is created
+
+SELECT * from BOOKS ;
+SELECT * FROM MEMBERS;
+SELECT * from BORROWINGS;
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
 --- add book
 
 CREATE OR REPLACE FUNCTION add_book(
-    p_book_id   books.book_id%TYPE, --this is also valid 
-    p_title            IN VARCHAR2,
-    p_author           IN VARCHAR2,
-    p_publisher        IN VARCHAR2,
-    p_year_published   IN DATE,
-    p_available_copies IN NUMBER
+    p_book_id          IN book.book_id%TYPE, 
+    p_title            IN book.book_title%TYPE,
+    p_author           IN book.author%TYPE,
+    p_publisher        IN book.publisher%TYPE,
+    p_year_published   IN book.year_publishes%TYPE,
+    p_available_copies IN book.available_copies%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -123,15 +137,16 @@ END;
 
 
 
---------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------
 --update book
+    
 CREATE OR REPLACE FUNCTION update_book(
-    p_book_id          IN NUMBER,
-    p_title            IN VARCHAR2,
-    p_author           IN VARCHAR2,
-    p_publisher        IN VARCHAR2,
-    p_year_published   IN DATE,
-    p_available_copies IN NUMBER
+    p_book_id          IN book.book_id%TYPE, 
+    p_title            IN book.book_title%TYPE,
+    p_author           IN book.author%TYPE,
+    p_publisher        IN book.publisher%TYPE,
+    p_year_published   IN book.year_publishes%TYPE,
+    p_available_copies IN book.available_copies%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -171,12 +186,12 @@ EXCEPTION
 END;
 /
 
---------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------
 --delete book 
 
 
 CREATE OR REPLACE FUNCTION delete_book(
-    p_book_id IN NUMBER
+    p_book_id IN book.book_id%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -208,7 +223,7 @@ END;
 /
 
 
----------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------
 -- search book 
 CREATE OR REPLACE PROCEDURE search_book(
     p_keyword IN VARCHAR2
@@ -253,11 +268,13 @@ END;
 /
 
 
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-- add member
 
 CREATE OR REPLACE FUNCTION add_member(
-    p_member_id   IN NUMBER,
-    p_member_name IN VARCHAR2,
-    p_email       IN VARCHAR2
+    p_member_id   IN members.member_id%TYPE,
+    p_member_name IN members.member_name%TYPE,
+    p_email       IN members.email%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -289,10 +306,14 @@ END;
 /
 
 
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-- update member
+
 CREATE OR REPLACE FUNCTION update_member(
-    p_member_id   IN NUMBER,
-    p_member_name IN VARCHAR2,
-    p_email       IN VARCHAR2
+   p_member_id   IN members.member_id%TYPE,
+    p_member_name IN members.member_name%TYPE,
+    p_email       IN members.email%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -326,8 +347,12 @@ END;
 /
 
 
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+-- delete member
+
 CREATE OR REPLACE FUNCTION delete_member(
-    p_member_id IN NUMBER
+    p_member_id IN memebrs.member.id%TYPE
 )
 RETURN VARCHAR2
 IS
@@ -360,9 +385,73 @@ END;
 
 
 
+--------------------------------------------------------------------------------------------------------------------------------------------------
+--borrow book 
 
 
+CREATE OR REPLACE FUNCTION borrow_book(
+    p_borrow_id IN borrowings.borrow_id%TYPE,
+    p_book_id IN borrowings.book_id%TYPE,
+    p_members_id IN borrowings.members_id%TYPE,
+    p_borrowed_date IN borrowings.borrowed_date%TYPE
+)
+RETURN varchar2
+AS
+    v_message VARCHAR2(100);
+    v_count   NUMBER;
+    v_copies NUMBER;
+BEGIN
+    -- check if book exists
+    SELECT COUNT(*) INTO v_count
+    FROM books
+    WHERE book_id = p_book_id;
 
+    IF v_count = 0 THEN
+        v_message := 'Book with ID ' || p_book_id || ' does not exist.';
+        RETURN v_message;
+    END IF;
+
+    -- check available copies 
+
+    SELECT available_copies INTO v_copies
+    FROM books
+    WHERE book_id = p_book_id;
+
+    IF v_copies = 0 THEN
+        v_message := 'No copies available for this book.';
+        RETURN v_message;
+    END IF;
+
+    -- check if memebr exists
+
+    SELECT COUNT(*) INTO v_count
+    FROM members
+    WHERE members_id = p_members_id;
+
+    IF v_count = 0 THEN
+        v_message := 'Member with ID ' || p_members_id || ' does not exist.';
+        RETURN v_message;
+    END IF;
+
+
+    -- borrow a book 
+    INSERT INTO borrowings (borrow_id, book_id, members_id, borrowed_date)
+    VALUES (borrow_seq.NEXTVAL, p_book_id, p_members_id, SYSDATE);
+
+    UPDATE books
+    SET available_copies = available_copies - 1
+    WHERE book_id = p_book_id;
+
+    v_message := 'Book borrowed successfully.';
+    RETURN v_message;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        v_message := 'Error borrowing book: ' || SQLERRM;
+        RETURN v_message;
+
+END;
+/
 
 
 
@@ -384,3 +473,4 @@ END;
 
 
 commit;
+
