@@ -388,7 +388,6 @@ END;
 --------------------------------------------------------------------------------------------------------------------------------------------------
 --borrow book 
 
-
 CREATE OR REPLACE FUNCTION borrow_book(
     p_book_id        IN borrowings.book_id%TYPE,
     p_members_id     IN borrowings.members_id%TYPE
@@ -452,24 +451,166 @@ END;
 /
 
 
+--------------------------------------------------------------------------------------------------------------------------------------------------
+--borrow book 
+CREATE OR REPLACE FUNCTION return_book(
+    p_book_id IN borrowings.book_id%TYPE,
+    p_members_id IN borrowings.members_id%TYPE
+)
+RETURN VARCHAR2
+AS
+    v_message VARCHAR2(100);
+    v_count   NUMBER;
+BEGIN
+    -- Check if the borrowing record exists and is not already returned
+    SELECT COUNT(*) INTO v_count
+    FROM borrowings
+    WHERE book_id = p_book_id
+      AND members_id = p_members_id
+      AND return_day IS NULL;
+
+    IF v_count = 0 THEN
+        RETURN 'No active borrowing found for this member and book.';
+    END IF;
+
+    -- Update the return date
+    UPDATE borrowings
+    SET return_day = SYSDATE
+    WHERE book_id = p_book_id
+      AND members_id = p_members_id
+      AND return_day IS NULL;
+
+    -- Increase available copies
+    UPDATE books
+    SET available_copies = available_copies + 1
+    WHERE book_id = p_book_id;
+
+    RETURN 'Book returned successfully.';
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN 'Error returning book: ' || SQLERRM;
+END;
+/
 
 
 
 
 
+CREATE OR REPLACE FUNCTION list_borrowings
+RETURN CLOB
+IS
+    v_result CLOB := '';
+BEGIN
+    v_result := v_result || '--- All Borrowings ---' || CHR(10);
+    v_result := v_result || 'BorrowID | Book Title | Member Name | Borrowed Date | Return Date' || CHR(10);
+    v_result := v_result || '---------------------------------------------------------------' || CHR(10);
 
+    FOR rec IN (
+        SELECT b.borrow_id,
+               bo.book_title,
+               m.member_name,
+               TO_CHAR(b.borrowed_date, 'DD-MON-YYYY') AS borrowed_date,
+               NVL(TO_CHAR(b.return_day, 'DD-MON-YYYY'), 'Not Returned') AS return_day
+        FROM borrowings b
+        JOIN books bo ON b.book_id = bo.book_id
+        JOIN members m ON b.members_id = m.members_id
+        ORDER BY b.borrow_id
+    )
+    LOOP
+        v_result := v_result || rec.borrow_id || ' | ' ||
+                               rec.book_title || ' | ' ||
+                               rec.member_name || ' | ' ||
+                               rec.borrowed_date || ' | ' ||
+                               rec.return_day || CHR(10);
+    END LOOP;
 
+    RETURN v_result;
 
-
-
-
-
-
-
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN 'Error listing borrowings: ' || SQLERRM;
+END;
+/
 
 
 
 
 commit;
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+--usage 
+SET SERVEROUTPUT ON;
+
+DECLARE
+    v_msg  VARCHAR2(200);
+    v_list CLOB;
+BEGIN
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 1️ Add Books
+    v_msg := add_book(6, 'The Hobbit', 'J.R.R. Tolkien', 'HarperCollins', TO_DATE('1937-09-21', 'YYYY-MM-DD'), 3);
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    v_msg := add_book(7, 'Moby Dick', 'Herman Melville', 'Harper & Brothers', TO_DATE('1851-11-14', 'YYYY-MM-DD'), 2);
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 2️ Update a Book
+    v_msg := update_book(6, 'The Hobbit', 'J.R.R. Tolkien', 'HarperCollins', TO_DATE('1937-09-21', 'YYYY-MM-DD'), 5);
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 3️ Delete a Book
+    v_msg := delete_book(7);
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 4️ Add Members
+    v_msg := add_member(6, 'Frank Miller', 'frank.m@example.com');
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    v_msg := add_member(7, 'Grace Hopper', 'grace.h@example.com');
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 5️ Update a Member
+    v_msg := update_member(6, 'Franklin Miller', 'franklin.m@example.com');
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 6️ Delete a Member
+    v_msg := delete_member(7);
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 7️ Borrow Books
+    v_msg := borrow_book(4, 2); -- Member 2 borrows Book 4
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    v_msg := borrow_book(5, 1); -- Member 1 borrows Book 5
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 8️ Return Books
+    v_msg := return_book(4, 2); -- Member 2 returns Book 4
+    DBMS_OUTPUT.PUT_LINE(v_msg);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 9️ List All Borrowings
+    v_list := list_borrowings;
+    DBMS_OUTPUT.PUT_LINE(v_list);
+
+    --------------------------------------------------------------------------------------------------------------------------------------------------
+    -- 10 Search a Book (procedure)
+    search_book('Hobbit');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error in library operations: ' || SQLERRM);
+END;
+/
+
 
 
